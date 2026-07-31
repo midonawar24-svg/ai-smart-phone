@@ -14,7 +14,6 @@ void main() {
 
 class SmartAiPhoneApp extends StatelessWidget {
   const SmartAiPhoneApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -30,7 +29,6 @@ class SmartAiPhoneApp extends StatelessWidget {
   }
 }
 
-// ===================== 1. شاشة القفل =====================
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
   @override
@@ -54,7 +52,7 @@ class _LockScreenState extends State<LockScreen> {
       bool canCheck = await auth.canCheckBiometrics;
       bool isSupported = await auth.isDeviceSupported();
       setState(() => _canCheckBiometrics = canCheck && isSupported);
-    } catch (e) {
+    } catch (_) {
       setState(() => _canCheckBiometrics = false);
     }
   }
@@ -67,7 +65,7 @@ class _LockScreenState extends State<LockScreen> {
       );
       if (authenticated && mounted) _navigateToDashboard();
     } catch (e) {
-      setState(() => _errorMessage = 'تعذر التحقق من البصمة: ${e.toString()}');
+      setState(() => _errorMessage = 'تعذر التحقق من البصمة: $e');
     }
   }
 
@@ -124,7 +122,6 @@ class _LockScreenState extends State<LockScreen> {
                   style: const TextStyle(fontSize: 22, letterSpacing: 10, fontWeight: FontWeight.bold),
                   decoration: InputDecoration(
                     hintText: '• • • •',
-                    hintStyle: const TextStyle(letterSpacing: 4),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.08),
@@ -140,31 +137,25 @@ class _LockScreenState extends State<LockScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.deepPurpleAccent,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 8,
                     ),
                     child: const Text('دخول النظام', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 if (_canCheckBiometrics)
-                  Column(
-                    children: [
-                      const Text('أو', style: TextStyle(color: Colors.white30)),
-                      const SizedBox(height: 12),
-                      InkWell(
-                        onTap: _authenticateBiometrics,
-                        borderRadius: BorderRadius.circular(50),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.cyanAccent)),
-                          child: const Icon(Icons.fingerprint, size: 48, color: Colors.cyanAccent),
-                        ),
-                      ),
-                    ],
+                  InkWell(
+                    onTap: _authenticateBiometrics,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.cyanAccent)),
+                      child: const Icon(Icons.fingerprint, size: 48, color: Colors.cyanAccent),
+                    ),
                   ),
-                const SizedBox(height: 16),
                 if (_errorMessage.isNotEmpty)
-                  Text(_errorMessage, style: const TextStyle(color: Colors.redAccent), textAlign: TextAlign.center),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Text(_errorMessage, style: const TextStyle(color: Colors.redAccent), textAlign: TextAlign.center),
+                  ),
               ],
             ),
           ),
@@ -174,28 +165,24 @@ class _LockScreenState extends State<LockScreen> {
   }
 }
 
-// ===================== 2. شاشة الذكاء =====================
 class AIDashboardScreen extends StatefulWidget {
   const AIDashboardScreen({super.key});
   @override
   State<AIDashboardScreen> createState() => _AIDashboardScreenState();
 }
 
-class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProviderStateMixin {
-  late AnimationController _pulseController;
+class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTickerProviderStateMixin {
   late stt.SpeechToText _speech;
   late FlutterTts _tts;
-  final TextEditingController _textController = TextEditingController();
-  final TextEditingController _apiKeyController = TextEditingController();
+  late AnimationController _pulseController;
   bool _isListening = false;
   bool _isProcessing = false;
-  String _thinkingProcess = 'بانتظار أمرك...';
-  String _aiResponse = 'مرحباً يا ميدو، أنا نظامك الذكي. اضغط على الإعدادات فوق لوضع مفتاح Gemini.';
+  final TextEditingController _textController = TextEditingController();
+  final TextEditingController _apiKeyController = TextEditingController();
+  String _thinkingProcess = 'النظام في وضع الاستعداد...';
+  String _aiResponse = 'أهلاً يا محمد. اضغط على أيقونة المفتاح فوق لإضافة مفتاح Gemini.';
   double _evolutionProgress = 0.53;
-  String _savedApiKey = "";
-
-  // مفتاح احتياطي ممكن تحطه في الكود
-  final String _hardcodedApiKey = "";
+  String _savedApiKey = '';
 
   @override
   void initState() {
@@ -204,21 +191,18 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
     _speech = stt.SpeechToText();
     _tts = FlutterTts();
     _initAudioEngine();
-    _loadData();
+    _loadAll();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadAll() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _evolutionProgress = prefs.getDouble('evo') ?? 0.53;
-      _savedApiKey = prefs.getString('gemini_api_key') ?? "";
+      _savedApiKey = prefs.getString('gemini_api_key') ?? '';
     });
-    if (_savedApiKey.isNotEmpty) {
-      _apiKeyController.text = _savedApiKey;
-    }
-    // لو مفيش مفتاح خالص افتح له النافذة تلقائي بعد ثانية
-    if (_savedApiKey.isEmpty && _hardcodedApiKey.isEmpty) {
-      Future.delayed(const Duration(milliseconds: 800), () {
+    _apiKeyController.text = _savedApiKey;
+    if (_savedApiKey.isEmpty) {
+      Future.delayed(const Duration(milliseconds: 700), () {
         if (mounted) _showApiKeyDialog();
       });
     }
@@ -236,25 +220,16 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
   }
 
   void _showApiKeyDialog() {
-    _apiKeyController.text = _savedApiKey;
     showDialog(
       context: context,
-      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E2F),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.key, color: Colors.cyanAccent),
-            SizedBox(width: 8),
-            Text('مفتاح Gemini API', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
+        title: const Row(children: [Icon(Icons.key, color: Colors.cyanAccent), SizedBox(width: 8), Text('مفتاح Gemini API', style: TextStyle(fontSize: 16))]),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('ضع مفتاح Gemini هنا عشان الذكاء يشتغل حقيقي، مش تجريبي:', style: TextStyle(fontSize: 12, color: Colors.white70)),
+            const Text('حط مفتاح Gemini هنا عشان الذكاء الحقيقي يشتغل:', style: TextStyle(fontSize: 12, color: Colors.white70)),
             const SizedBox(height: 12),
             TextField(
               controller: _apiKeyController,
@@ -263,18 +238,11 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.08),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                prefixIcon: const Icon(Icons.vpn_key),
               ),
               style: const TextStyle(fontSize: 13),
             ),
-            const SizedBox(height: 10),
-            const Text('هاته من: aistudio.google.com/app/apikey', style: TextStyle(fontSize: 10, color: Colors.cyanAccent)),
             const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-              child: const Text('المفتاح بيتخزن على جهازك بس، مش بيروح لحد.', style: TextStyle(fontSize: 10, color: Colors.amber)),
-            ),
+            const Text('aistudio.google.com/app/apikey', style: TextStyle(fontSize: 10, color: Colors.cyanAccent)),
           ],
         ),
         actions: [
@@ -283,9 +251,7 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
             onPressed: () {
               _saveApiKey(_apiKeyController.text);
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(_apiKeyController.text.trim().isEmpty ? 'تم مسح المفتاح - الوضع التجريبي شغال' : 'تم حفظ المفتاح بنجاح! جرب تسأل سؤال')),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ المفتاح!')));
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurpleAccent),
             child: const Text('حفظ'),
@@ -301,9 +267,7 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
       if (s == 'done' || s == 'notListening') setState(() => _isListening = false);
     });
     await _tts.setLanguage("ar-EG");
-    await _tts.setPitch(1.0);
     await _tts.setSpeechRate(0.85);
-    await _tts.setVolume(1.0);
   }
 
   void _toggleListening() async {
@@ -328,22 +292,21 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
     if (input.trim().isEmpty) return;
     setState(() {
       _isProcessing = true;
-      _thinkingProcess = '🧠 جاري التحليل...\n- المدخل: "$input"\n- فحص المفتاح...\n- الاتصال بـ Gemini...';
+      _thinkingProcess = 'جاري التحليل...\n- المدخل: $input\n- فحص المفتاح...';
       _aiResponse = 'لحظة...';
     });
 
     try {
-      String activeKey = _savedApiKey.isNotEmpty ? _savedApiKey : _hardcodedApiKey;
-      String responseText = "";
-      bool isRealAI = false;
+      String responseText = '';
+      bool isReal = false;
 
-      if (activeKey.isNotEmpty && activeKey.startsWith("AIza")) {
-        final url = Uri.parse("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$activeKey");
+      if (_savedApiKey.isNotEmpty && _savedApiKey.startsWith('AIza')) {
+        final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_savedApiKey');
         final body = jsonEncode({
           "contents": [
             {
               "parts": [
-                {"text": "انت مساعد ذكي عربي اسمه AI SYSTEM OS، بترد بالعربي المصري بشكل ذكي ومختصر ومفيد. المستخدم بيقول: $input"}
+                {"text": "انت مساعد ذكي عربي. رد بالعربي المصري باختصار: $input"}
               ]
             }
           ]
@@ -352,19 +315,17 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           responseText = data['candidates'][0]['content']['parts'][0]['text'];
-          isRealAI = true;
+          isReal = true;
         } else {
-          responseText = "خطأ من Gemini (${res.statusCode}):\n${res.body.substring(0, res.body.length > 400 ? 400 : res.body.length)}\n\nتأكد ان المفتاح صحيح.";
+          responseText = 'خطأ ${res.statusCode}: ${res.body.substring(0, res.body.length > 300 ? 300 : res.body.length)}';
         }
       } else {
         await Future.delayed(const Duration(seconds: 1));
-        responseText = "تم تحليل أمرك: '$input'.\n\n⚠️ ده رد تجريبي لأنك لسه محطيتش مفتاح Gemini.\n\nدوس على أيقونة المفتاح 🔑 فوق عشان تحط المفتاح، وهاته من:\naistudio.google.com/app/apikey\n\nبعد ما تحطه، النظام هيرد بذكاء حقيقي ويطور نفسه +2% كل مرة.";
+        responseText = 'تم تحليل: $input\n\n⚠️ ده رد تجريبي. دوس على 🔑 فوق وحط مفتاح Gemini من aistudio.google.com/app/apikey عشان الذكاء الحقيقي يشتغل.';
       }
 
       setState(() {
-        _thinkingProcess = isRealAI
-            ? '✓ تم التحليل بنجاح (ذكاء حقيقي)\n- المفتاح: موجود وفعال\n- الاتصال: Gemini 1.5 Flash\n- الذاكرة: تم التحديث\n- النطق: جاري'
-            : '✓ تم التحليل بنجاح (وضع تجريبي)\n- المفتاح: غير موجود\n- الذاكرة: تم التحديث\n- النمط المعرفي: مُثبّت\n- الاستجابة: جاهزة';
+        _thinkingProcess = isReal ? '✓ تم بنجاح (ذكاء حقيقي)\n- Gemini 1.5 Flash' : '✓ تم (تجريبي)\n- ضع المفتاح للذكاء الحقيقي';
         _aiResponse = responseText;
         _evolutionProgress = (_evolutionProgress + 0.02).clamp(0.0, 1.0);
         _isProcessing = false;
@@ -373,8 +334,8 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
       await _tts.speak(_aiResponse);
     } catch (e) {
       setState(() {
-        _thinkingProcess = '✗ خطأ: $e';
-        _aiResponse = 'تعذر الاتصال. تأكد من النت والمفتاح. دوس على 🔑 فوق.';
+        _thinkingProcess = 'خطأ: $e';
+        _aiResponse = 'تعذر الاتصال. تأكد من النت والمفتاح.';
         _isProcessing = false;
       });
     }
@@ -391,19 +352,20 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
 
   @override
   Widget build(BuildContext context) {
-    bool hasKey = _savedApiKey.isNotEmpty || _hardcodedApiKey.isNotEmpty;
+    bool hasKey = _savedApiKey.isNotEmpty;
     return Scaffold(
       appBar: AppBar(
         title: const Text('عقل النظام (Core Engine)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black.withOpacity(0.4),
-        elevation: 0,
         actions: [
           IconButton(
             icon: Icon(Icons.vpn_key, color: hasKey ? Colors.greenAccent : Colors.amber),
-            tooltip: 'مفتاح Gemini',
             onPressed: _showApiKeyDialog,
           ),
-          IconButton(icon: const Icon(Icons.lock_outline), onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LockScreen())))
+          IconButton(
+            icon: const Icon(Icons.lock_outline),
+            onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LockScreen())),
+          ),
         ],
       ),
       body: Container(
@@ -416,23 +378,31 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
             children: [
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.cyanAccent.withOpacity(0.2))),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.cyanAccent.withOpacity(0.2)),
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      const Row(children: [Icon(Icons.auto_graph, size: 16, color: Colors.white70), SizedBox(width: 6), Text('مستوى التطور التراكمي', style: TextStyle(color: Colors.white70, fontSize: 12))]),
-                      Text('${(_evolutionProgress * 100).toStringAsFixed(1)}%', style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
-                    ]),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(children: [Icon(Icons.auto_graph, size: 16, color: Colors.white70), SizedBox(width: 6), Text('مستوى التطور', style: TextStyle(color: Colors.white70, fontSize: 12))]),
+                        Text('${(_evolutionProgress * 100).toStringAsFixed(1)}%', style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                     const SizedBox(height: 10),
-                    ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: _evolutionProgress, minHeight: 8, backgroundColor: Colors.white12, color: Colors.cyanAccent)),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(value: _evolutionProgress, minHeight: 8, backgroundColor: Colors.white12, color: Colors.cyanAccent),
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Icon(hasKey ? Icons.check_circle : Icons.warning, size: 12, color: hasKey ? Colors.greenAccent : Colors.amber),
                         const SizedBox(width: 4),
-                        Text(hasKey ? 'المفتاح: موجود - الذكاء الحقيقي شغال' : 'المفتاح: مش موجود - وضع تجريبي - دوس 🔑 فوق',
-                            style: TextStyle(fontSize: 10, color: hasKey ? Colors.greenAccent : Colors.amber)),
+                        Text(hasKey ? 'المفتاح موجود - ذكاء حقيقي' : 'لا يوجد مفتاح - دوس 🔑 فوق', style: TextStyle(fontSize: 10, color: hasKey ? Colors.greenAccent : Colors.amber)),
                       ],
                     ),
                   ],
@@ -445,11 +415,16 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.deepPurpleAccent.withOpacity(0.4))),
-                  child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Row(children: [Icon(Icons.memory, color: Colors.deepPurpleAccent, size: 18), SizedBox(width: 8), Text('مسار التفكير الداخلي:', style: TextStyle(fontSize: 13, color: Colors.deepPurpleAccent, fontWeight: FontWeight.bold))]),
-                    const Divider(color: Colors.white12),
-                    Text(_thinkingProcess, style: const TextStyle(fontFamily: 'monospace', color: Colors.greenAccent, fontSize: 12, height: 1.5)),
-                  ])),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(children: [Icon(Icons.memory, color: Colors.deepPurpleAccent, size: 18), SizedBox(width: 8), Text('مسار التفكير:', style: TextStyle(fontSize: 13, color: Colors.deepPurpleAccent, fontWeight: FontWeight.bold))]),
+                        const Divider(color: Colors.white12),
+                        Text(_thinkingProcess, style: const TextStyle(fontFamily: 'monospace', color: Colors.greenAccent, fontSize: 12)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -459,16 +434,54 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProvid
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
-                  child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Row(children: [Icon(Icons.forum_outlined, color: Colors.cyanAccent, size: 18), SizedBox(width: 8), Text('الرد الناطق:', style: TextStyle(fontSize: 13, color: Colors.cyanAccent, fontWeight: FontWeight.bold))]),
-                    const Divider(color: Colors.white12),
-                    Text(_aiResponse, style: const TextStyle(fontSize: 15, height: 1.6)),
-                  ])),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(children: [Icon(Icons.forum_outlined, color: Colors.cyanAccent, size: 18), SizedBox(width: 8), Text('الرد الناطق:', style: TextStyle(fontSize: 13, color: Colors.cyanAccent, fontWeight: FontWeight.bold))]),
+                        const Divider(color: Colors.white12),
+                        Text(_aiResponse, style: const TextStyle(fontSize: 15, height: 1.6)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
-              Row(children: [
-                Expanded(child: TextField(
-                  controller: _textController,
-                  onSubmitted: (val) => _processAICommand(val),
-            
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _textController,
+                      onSubmitted: (val) => _processAICommand(val),
+                      decoration: InputDecoration(
+                        hintText: _isListening ? 'بسمعك...' : 'اكتب أمراً...',
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.08),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  FloatingActionButton(
+                    onPressed: _isProcessing
+                        ? null
+                        : () {
+                            if (_textController.text.isNotEmpty && !_isListening) {
+                              _processAICommand(_textController.text);
+                            } else {
+                              _toggleListening();
+                            }
+                          },
+                    backgroundColor: _isListening ? Colors.redAccent : Colors.deepPurpleAccent,
+                    child: Icon(_isListening ? Icons.mic : (_textController.text.isNotEmpty ? Icons.send : Icons.mic_none)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
