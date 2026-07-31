@@ -1,4 +1,47 @@
-import 'dart:convert';
+name: Build APK
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+      - name: Fix all files automatically
+        run: |
+          echo "Fixing pubspec and main.dart..."
+          cat > pubspec.yaml << 'YAML_EOF'
+          name: ai_smart_phone
+          description: AI Self-Evolving Phone System
+          publish_to: 'none'
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            local_auth: ^2.1.7
+            flutter_tts: 4.0.2
+            speech_to_text: ^6.6.0
+            http: ^1.1.0
+            shared_preferences: ^2.2.2
+            permission_handler: ^11.3.1
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^3.0.0
+          flutter:
+            uses-material-design: true
+          YAML_EOF
+
+          cat > lib/main.dart << 'DART_EOF'
+          import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -300,20 +343,8 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
       String responseText = '';
       bool isReal = false;
 
-      if (_savedApiKey.isNotEmpty) {
-        // لو المفتاح مش بيبدأ ب AIza برضه هنجرب
-        String keyToUse = _savedApiKey.trim();
-        if (keyToUse.length < 20) {
-          setState(() {
-            _thinkingProcess = '✗ المفتاح قصير جدا!\n- الطول: ${keyToUse.length} حرف\n- المفروض يبدأ بـ AIza ويكون 39 حرف';
-            _aiResponse = 'المفتاح اللي حطيته شكله غلط. روح aistudio.google.com/app/apikey وهات مفتاح جديد يبدأ بـ AIza';
-            _isProcessing = false;
-          });
-          return;
-        }
-
-        final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$keyToUse');
-        final fallbackUrl = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$keyToUse');
+      if (_savedApiKey.isNotEmpty && _savedApiKey.startsWith('AIza')) {
+        final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_savedApiKey');
         final body = jsonEncode({
           "contents": [
             {
@@ -323,41 +354,13 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
             }
           ]
         });
-        http.Response res;
-        try {
-          res = await http.post(url, headers: {"Content-Type": "application/json"}, body: body).timeout(const Duration(seconds: 15));
-        } catch (e) {
-          res = await http.post(fallbackUrl, headers: {"Content-Type": "application/json"}, body: body).timeout(const Duration(seconds: 15));
-        }
-
+        final res = await http.post(url, headers: {"Content-Type": "application/json"}, body: body);
         if (res.statusCode == 200) {
-          try {
-            final data = jsonDecode(res.body);
-            responseText = data['candidates'][0]['content']['parts'][0]['text'];
-            isReal = true;
-          } catch (e) {
-            responseText = 'الرد وصل بس مش قادر افسره: ${res.body.substring(0, 200)}';
-          }
+          final data = jsonDecode(res.body);
+          responseText = data['candidates'][0]['content']['parts'][0]['text'];
+          isReal = true;
         } else {
-          String shortBody = res.body.length > 500 ? res.body.substring(0, 500) : res.body;
-          if (res.statusCode == 400) {
-            responseText = 'خطأ 400: المفتاح غلط أو منتهي.\n$shortBody\n\nروح هات مفتاح جديد من aistudio.google.com';
-          } else if (res.statusCode == 403) {
-            responseText = 'خطأ 403: الـ API مش متفعل.\n$shortBody\n\nادخل Google Cloud وفعل Generative Language API';
-          } else if (res.statusCode == 404) {
-            responseText = 'خطأ 404: الموديل مش موجود، هجرب موديل تاني...\n$shortBody';
-            // جرب fallback
-            final res2 = await http.post(fallbackUrl, headers: {"Content-Type": "application/json"}, body: body);
-            if (res2.statusCode == 200) {
-              final data = jsonDecode(res2.body);
-              responseText = data['candidates'][0]['content']['parts'][0]['text'];
-              isReal = true;
-            } else {
-              responseText = 'برضه فشل: ${res2.statusCode} - ${res2.body.substring(0, 200)}';
-            }
-          } else {
-            responseText = 'خطأ ${res.statusCode}: $shortBody';
-          }
+          responseText = 'خطأ ${res.statusCode}: ${res.body.substring(0, res.body.length > 300 ? 300 : res.body.length)}';
         }
       } else {
         await Future.delayed(const Duration(seconds: 1));
@@ -488,4 +491,56 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
               ),
               const SizedBox(height: 12),
               Row(
-              
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _textController,
+                      onSubmitted: (val) => _processAICommand(val),
+                      decoration: InputDecoration(
+                        hintText: _isListening ? 'بسمعك...' : 'اكتب أمراً...',
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.08),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  FloatingActionButton(
+                    onPressed: _isProcessing
+                        ? null
+                        : () {
+                            if (_textController.text.isNotEmpty && !_isListening) {
+                              _processAICommand(_textController.text);
+                            } else {
+                              _toggleListening();
+                            }
+                          },
+                    backgroundColor: _isListening ? Colors.redAccent : Colors.deepPurpleAccent,
+                    child: Icon(_isListening ? Icons.mic : (_textController.text.isNotEmpty ? Icons.send : Icons.mic_none)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+          DART_EOF
+
+          echo "Files fixed!"
+      - name: Build APK
+        run: |
+          rm -rf android
+          flutter create --platforms=android --project-name ai_smart_phone --org com.mido.ai --overwrite .
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.1.10"/' android/settings.gradle
+          flutter pub get
+          flutter build apk --release --no-tree-shake-icons
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
