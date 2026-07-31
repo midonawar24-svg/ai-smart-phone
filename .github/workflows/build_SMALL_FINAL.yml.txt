@@ -1,0 +1,59 @@
+name: Build APK
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+      - name: Fix and Build
+        run: |
+          rm -rf android .dart_tool
+          flutter create --platforms=android --project-name ai_smart_phone --org com.mido.ai . --overwrite
+          # Restore main.dart if was saved by checkout (we need to have correct main.dart in repo)
+          # If lib/main.dart was overwritten, checkout again the file from git
+          git checkout HEAD -- lib/main.dart || echo "keep generated main, will use repo version"
+          cat > pubspec.yaml << 'YAML'
+          name: ai_smart_phone
+          description: AI Self System Final Fixed
+          publish_to: 'none'
+          version: 1.0.0+51
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+          dependencies:
+            flutter:
+              sdk: flutter
+            local_auth: 2.1.7
+            flutter_tts: 4.2.3
+            speech_to_text: 6.6.2
+            http: 1.2.2
+            shared_preferences: 2.3.2
+            permission_handler: 11.3.1
+          flutter:
+            uses-material-design: true
+          YAML
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.1.10"/' android/settings.gradle
+          python3 << 'PY'
+          import pathlib
+          mf = pathlib.Path("android/app/src/main/AndroidManifest.xml")
+          txt = mf.read_text()
+          if "android.permission.INTERNET" not in txt:
+              txt = txt.replace("<application", '<uses-permission android:name="android.permission.INTERNET" />
+    <application')
+              mf.write_text(txt)
+              print("Added INTERNET")
+          print("Manifest OK")
+          PY
+          flutter pub get
+          flutter build apk --release --no-tree-shake-icons
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-WITH-INTERNET
+          path: build/app/outputs/flutter-apk/app-release.apk
