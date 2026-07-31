@@ -18,7 +18,7 @@ jobs:
           cp pubspec.yaml /tmp/pubspec.yaml
           cp lib/main.dart /tmp/main.dart
           rm -rf android
-          flutter create . --project-name ai_smart_phone --org com.mido.ai --overwrite
+          flutter create --project-name ai_smart_phone --org com.mido.ai --overwrite .
           cp /tmp/pubspec.yaml ./pubspec.yaml
           cp /tmp/main.dart ./lib/main.dart
           flutter pub get
