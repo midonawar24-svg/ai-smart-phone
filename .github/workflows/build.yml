@@ -17,7 +17,7 @@ jobs:
         run: |
           cp lib/main.dart /tmp/main.dart
           cp pubspec.yaml /tmp/pubspec.yaml
-          rm -rf android
+          rm -rf androidflutter create --platforms=android --overwrite .
           flutter create --platforms=android --overwrite .
           cp /tmp/pubspec.yaml ./pubspec.yaml
           cp /tmp/main.dart ./lib/main.dart
