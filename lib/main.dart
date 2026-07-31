@@ -300,8 +300,20 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
       String responseText = '';
       bool isReal = false;
 
-      if (_savedApiKey.isNotEmpty && _savedApiKey.startsWith('AIza')) {
-        final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_savedApiKey');
+      if (_savedApiKey.isNotEmpty) {
+        // لو المفتاح مش بيبدأ ب AIza برضه هنجرب
+        String keyToUse = _savedApiKey.trim();
+        if (keyToUse.length < 20) {
+          setState(() {
+            _thinkingProcess = '✗ المفتاح قصير جدا!\n- الطول: ${keyToUse.length} حرف\n- المفروض يبدأ بـ AIza ويكون 39 حرف';
+            _aiResponse = 'المفتاح اللي حطيته شكله غلط. روح aistudio.google.com/app/apikey وهات مفتاح جديد يبدأ بـ AIza';
+            _isProcessing = false;
+          });
+          return;
+        }
+
+        final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$keyToUse');
+        final fallbackUrl = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$keyToUse');
         final body = jsonEncode({
           "contents": [
             {
@@ -311,13 +323,41 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
             }
           ]
         });
-        final res = await http.post(url, headers: {"Content-Type": "application/json"}, body: body);
+        http.Response res;
+        try {
+          res = await http.post(url, headers: {"Content-Type": "application/json"}, body: body).timeout(const Duration(seconds: 15));
+        } catch (e) {
+          res = await http.post(fallbackUrl, headers: {"Content-Type": "application/json"}, body: body).timeout(const Duration(seconds: 15));
+        }
+
         if (res.statusCode == 200) {
-          final data = jsonDecode(res.body);
-          responseText = data['candidates'][0]['content']['parts'][0]['text'];
-          isReal = true;
+          try {
+            final data = jsonDecode(res.body);
+            responseText = data['candidates'][0]['content']['parts'][0]['text'];
+            isReal = true;
+          } catch (e) {
+            responseText = 'الرد وصل بس مش قادر افسره: ${res.body.substring(0, 200)}';
+          }
         } else {
-          responseText = 'خطأ ${res.statusCode}: ${res.body.substring(0, res.body.length > 300 ? 300 : res.body.length)}';
+          String shortBody = res.body.length > 500 ? res.body.substring(0, 500) : res.body;
+          if (res.statusCode == 400) {
+            responseText = 'خطأ 400: المفتاح غلط أو منتهي.\n$shortBody\n\nروح هات مفتاح جديد من aistudio.google.com';
+          } else if (res.statusCode == 403) {
+            responseText = 'خطأ 403: الـ API مش متفعل.\n$shortBody\n\nادخل Google Cloud وفعل Generative Language API';
+          } else if (res.statusCode == 404) {
+            responseText = 'خطأ 404: الموديل مش موجود، هجرب موديل تاني...\n$shortBody';
+            // جرب fallback
+            final res2 = await http.post(fallbackUrl, headers: {"Content-Type": "application/json"}, body: body);
+            if (res2.statusCode == 200) {
+              final data = jsonDecode(res2.body);
+              responseText = data['candidates'][0]['content']['parts'][0]['text'];
+              isReal = true;
+            } else {
+              responseText = 'برضه فشل: ${res2.statusCode} - ${res2.body.substring(0, 200)}';
+            }
+          } else {
+            responseText = 'خطأ ${res.statusCode}: $shortBody';
+          }
         }
       } else {
         await Future.delayed(const Duration(seconds: 1));
@@ -448,40 +488,4 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
               ),
               const SizedBox(height: 12),
               Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      onSubmitted: (val) => _processAICommand(val),
-                      decoration: InputDecoration(
-                        hintText: _isListening ? 'بسمعك...' : 'اكتب أمراً...',
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.08),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  FloatingActionButton(
-                    onPressed: _isProcessing
-                        ? null
-                        : () {
-                            if (_textController.text.isNotEmpty && !_isListening) {
-                              _processAICommand(_textController.text);
-                            } else {
-                              _toggleListening();
-                            }
-                          },
-                    backgroundColor: _isListening ? Colors.redAccent : Colors.deepPurpleAccent,
-                    child: Icon(_isListening ? Icons.mic : (_textController.text.isNotEmpty ? Icons.send : Icons.mic_none)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+              
