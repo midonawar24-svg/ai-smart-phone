@@ -13,27 +13,40 @@ jobs:
         with:
           flutter-version: '3.24.5'
           channel: 'stable'
-      - name: Fix and Build
+      - name: Fix everything and Build
         run: |
+          echo "Saving your main.dart"
+          cp lib/main.dart /tmp/my_main.dart
           rm -rf android .dart_tool
           flutter create --platforms=android --project-name ai_smart_phone --org com.mido.ai . --overwrite
-          git checkout HEAD -- lib/main.dart || true
-          flutter pub add local_auth flutter_tts speech_to_text http shared_preferences permission_handler
-          sed -i 's/kotlin.*2.1.10/kotlin" version "2.1.10"/' android/settings.gradle || true
+          cp /tmp/my_main.dart lib/main.dart
+          echo "Restored main.dart"
+          cat > pubspec.yaml << 'YAML'
+          name: ai_smart_phone
+          description: AI Self System Final Fixed
+          publish_to: 'none'
+          version: 1.0.0+60
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+          dependencies:
+            flutter:
+              sdk: flutter
+            local_auth: 2.1.7
+            flutter_tts: 4.2.3
+            speech_to_text: 6.6.2
+            http: 1.2.2
+            shared_preferences: 2.3.2
+            permission_handler: 11.3.1
+          flutter:
+            uses-material-design: true
+          YAML
           sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.1.10"/' android/settings.gradle || true
-          python3 <<PY
-          import pathlib
-          p=pathlib.Path('android/app/src/main/AndroidManifest.xml')
-          t=p.read_text()
-          if 'android.permission.INTERNET' not in t:
-              t=t.replace('<application','<uses-permission android:name="android.permission.INTERNET" /><application')
-              p.write_text(t)
-              print('added internet')
-          PY
+          grep -q "INTERNET" android/app/src/main/AndroidManifest.xml || sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
           flutter pub get
           flutter build apk --release --no-tree-shake-icons
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: app-release-WITH-INTERNET
+          name: app-release-final-fixed
           path: build/app/outputs/flutter-apk/app-release.apk
           
