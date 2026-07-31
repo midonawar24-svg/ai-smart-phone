@@ -11,16 +11,14 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.2'
+          flutter-version: '3.24.0'
           channel: 'stable'
       - name: Build APK
         run: |
-          echo "=== BEFORE ==="
-          ls -R | head -n 100
           cp lib/main.dart /tmp/main.dart
           cp pubspec.yaml /tmp/pubspec.yaml
-          rm -rf android ios web macos windows linux test
-          flutter create --project-name ai_smart_phone --org com.mido.ai --platforms=android --overwrite .
+          rm -rf android
+          flutter create --platforms=android --overwrite .
           cp /tmp/pubspec.yaml ./pubspec.yaml
           cp /tmp/main.dart ./lib/main.dart
           flutter pub get
