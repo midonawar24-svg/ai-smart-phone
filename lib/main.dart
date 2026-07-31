@@ -162,14 +162,9 @@ class _LockScreenState extends State<LockScreen> {
                       ),
                     ],
                   ),
-                if (_errorMessage.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.red.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
-                    child: Text(_errorMessage, style: const TextStyle(color: Colors.redAccent)),
-                  ),
-                ]
+                const SizedBox(height: 16),
+                if (_errorMessage.isNotEmpty)
+                  Text(_errorMessage, style: const TextStyle(color: Colors.redAccent), textAlign: TextAlign.center),
               ],
             ),
           ),
@@ -179,27 +174,28 @@ class _LockScreenState extends State<LockScreen> {
   }
 }
 
-// ===================== 2. لوحة التحكم الرئيسية =====================
+// ===================== 2. شاشة الذكاء =====================
 class AIDashboardScreen extends StatefulWidget {
   const AIDashboardScreen({super.key});
   @override
   State<AIDashboardScreen> createState() => _AIDashboardScreenState();
 }
 
-class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTickerProviderStateMixin {
+class _AIDashboardScreenState extends State<AIDashboardScreen> with TickerProviderStateMixin {
+  late AnimationController _pulseController;
   late stt.SpeechToText _speech;
   late FlutterTts _tts;
-  late AnimationController _pulseController;
+  final TextEditingController _textController = TextEditingController();
+  final TextEditingController _apiKeyController = TextEditingController();
   bool _isListening = false;
   bool _isProcessing = false;
-  final TextEditingController _textController = TextEditingController();
-  String _thinkingProcess = 'النظام في وضع الاستعداد...\nجاهز لتحليل أوامرك.';
-  String _aiResponse = 'أهلاً بك يا محمد. أنا جهازك الذكي المتطور، جاهز لتلقي أوامرك الصوتية أو النصية. تحدث الآن أو اكتب ما تريد.';
-  double _evolutionProgress = 0.45;
+  String _thinkingProcess = 'بانتظار أمرك...';
+  String _aiResponse = 'مرحباً يا ميدو، أنا نظامك الذكي. اضغط على الإعدادات فوق لوضع مفتاح Gemini.';
+  double _evolutionProgress = 0.53;
+  String _savedApiKey = "";
 
-  // !!! حط مفتاح Gemini هنا !!!
-  // هاته من: https://aistudio.google.com/app/apikey
-  final String _apiKey = "YOUR_GEMINI_API_KEY_HERE";
+  // مفتاح احتياطي ممكن تحطه في الكود
+  final String _hardcodedApiKey = "";
 
   @override
   void initState() {
@@ -208,25 +204,95 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
     _speech = stt.SpeechToText();
     _tts = FlutterTts();
     _initAudioEngine();
-    _loadProgress();
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    _tts.stop();
-    _textController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadProgress() async {
+  Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _evolutionProgress = prefs.getDouble('evo') ?? 0.45);
+    setState(() {
+      _evolutionProgress = prefs.getDouble('evo') ?? 0.53;
+      _savedApiKey = prefs.getString('gemini_api_key') ?? "";
+    });
+    if (_savedApiKey.isNotEmpty) {
+      _apiKeyController.text = _savedApiKey;
+    }
+    // لو مفيش مفتاح خالص افتح له النافذة تلقائي بعد ثانية
+    if (_savedApiKey.isEmpty && _hardcodedApiKey.isEmpty) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) _showApiKeyDialog();
+      });
+    }
   }
 
   Future<void> _saveProgress() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('evo', _evolutionProgress);
+  }
+
+  Future<void> _saveApiKey(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('gemini_api_key', key.trim());
+    setState(() => _savedApiKey = key.trim());
+  }
+
+  void _showApiKeyDialog() {
+    _apiKeyController.text = _savedApiKey;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E2F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.key, color: Colors.cyanAccent),
+            SizedBox(width: 8),
+            Text('مفتاح Gemini API', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('ضع مفتاح Gemini هنا عشان الذكاء يشتغل حقيقي، مش تجريبي:', style: TextStyle(fontSize: 12, color: Colors.white70)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _apiKeyController,
+              decoration: InputDecoration(
+                hintText: 'AIzaSy...',
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.08),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.vpn_key),
+              ),
+              style: const TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 10),
+            const Text('هاته من: aistudio.google.com/app/apikey', style: TextStyle(fontSize: 10, color: Colors.cyanAccent)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+              child: const Text('المفتاح بيتخزن على جهازك بس، مش بيروح لحد.', style: TextStyle(fontSize: 10, color: Colors.amber)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () {
+              _saveApiKey(_apiKeyController.text);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(_apiKeyController.text.trim().isEmpty ? 'تم مسح المفتاح - الوضع التجريبي شغال' : 'تم حفظ المفتاح بنجاح! جرب تسأل سؤال')),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurpleAccent),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _initAudioEngine() async {
@@ -262,36 +328,43 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
     if (input.trim().isEmpty) return;
     setState(() {
       _isProcessing = true;
-      _thinkingProcess = '>> [INPUT] "$input"\n>> [NLP] تحليل النية والسياق...\n>> [MEMORY] استرجاع الذاكرة التراكمية ($_evolutionProgress)...\n>> [REASONING] بناء سلسلة التفكير المنطقي...\n>> [GEMINI] إرسال إلى محرك Gemini 2.5 Flash...';
-      _aiResponse = 'جاري التفكير...';
+      _thinkingProcess = '🧠 جاري التحليل...\n- المدخل: "$input"\n- فحص المفتاح...\n- الاتصال بـ Gemini...';
+      _aiResponse = 'لحظة...';
     });
 
     try {
+      String activeKey = _savedApiKey.isNotEmpty ? _savedApiKey : _hardcodedApiKey;
       String responseText = "";
-      if (_apiKey != "YOUR_GEMINI_API_KEY_HERE" && _apiKey.length > 20) {
-        final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_apiKey');
-        final res = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            "contents": [{"parts": [{"text": "أنت مساعد ذكي ذاتي التطور اسمه AI Self System. رد بالعربية المصرية العامية المفهومة. سؤال المستخدم: $input"}]}],
-            "generationConfig": {"temperature": 0.8, "maxOutputTokens": 1024}
-          }),
-        ).timeout(const Duration(seconds: 20));
+      bool isRealAI = false;
 
+      if (activeKey.isNotEmpty && activeKey.startsWith("AIza")) {
+        final url = Uri.parse("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$activeKey");
+        final body = jsonEncode({
+          "contents": [
+            {
+              "parts": [
+                {"text": "انت مساعد ذكي عربي اسمه AI SYSTEM OS، بترد بالعربي المصري بشكل ذكي ومختصر ومفيد. المستخدم بيقول: $input"}
+              ]
+            }
+          ]
+        });
+        final res = await http.post(url, headers: {"Content-Type": "application/json"}, body: body);
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           responseText = data['candidates'][0]['content']['parts'][0]['text'];
+          isRealAI = true;
         } else {
-          responseText = "خطأ من Gemini: ${res.statusCode}\n${res.body.substring(0, 200)}";
+          responseText = "خطأ من Gemini (${res.statusCode}):\n${res.body.substring(0, res.body.length > 400 ? 400 : res.body.length)}\n\nتأكد ان المفتاح صحيح.";
         }
       } else {
         await Future.delayed(const Duration(seconds: 1));
-        responseText = "تم تحليل أمرك: '$input'.\n\nهذا رد تجريبي لأنك لم تضع مفتاح Gemini API بعد. ضع المفتاح في الكود في السطر _apiKey. النظام حفظ المنطق ده في الذاكرة وطور نفسه +2%.";
+        responseText = "تم تحليل أمرك: '$input'.\n\n⚠️ ده رد تجريبي لأنك لسه محطيتش مفتاح Gemini.\n\nدوس على أيقونة المفتاح 🔑 فوق عشان تحط المفتاح، وهاته من:\naistudio.google.com/app/apikey\n\nبعد ما تحطه، النظام هيرد بذكاء حقيقي ويطور نفسه +2% كل مرة.";
       }
 
       setState(() {
-        _thinkingProcess = '✓ تم التحليل بنجاح\n- المدخل: تم فهمه\n- الذاكرة: تم التحديث\n- النمط المعرفي: مُثبّت ومُحسّن\n- الاستجابة: جاهزة للنطق';
+        _thinkingProcess = isRealAI
+            ? '✓ تم التحليل بنجاح (ذكاء حقيقي)\n- المفتاح: موجود وفعال\n- الاتصال: Gemini 1.5 Flash\n- الذاكرة: تم التحديث\n- النطق: جاري'
+            : '✓ تم التحليل بنجاح (وضع تجريبي)\n- المفتاح: غير موجود\n- الذاكرة: تم التحديث\n- النمط المعرفي: مُثبّت\n- الاستجابة: جاهزة';
         _aiResponse = responseText;
         _evolutionProgress = (_evolutionProgress + 0.02).clamp(0.0, 1.0);
         _isProcessing = false;
@@ -300,21 +373,36 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
       await _tts.speak(_aiResponse);
     } catch (e) {
       setState(() {
-        _thinkingProcess = '✗ خطأ أثناء المعالجة: $e';
-        _aiResponse = 'تعذر الاتصال. تأكد من الإنترنت ومفتاح Gemini.';
+        _thinkingProcess = '✗ خطأ: $e';
+        _aiResponse = 'تعذر الاتصال. تأكد من النت والمفتاح. دوس على 🔑 فوق.';
         _isProcessing = false;
       });
     }
   }
 
   @override
+  void dispose() {
+    _pulseController.dispose();
+    _tts.stop();
+    _textController.dispose();
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    bool hasKey = _savedApiKey.isNotEmpty || _hardcodedApiKey.isNotEmpty;
     return Scaffold(
       appBar: AppBar(
         title: const Text('عقل النظام (Core Engine)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black.withOpacity(0.4),
         elevation: 0,
         actions: [
+          IconButton(
+            icon: Icon(Icons.vpn_key, color: hasKey ? Colors.greenAccent : Colors.amber),
+            tooltip: 'مفتاح Gemini',
+            onPressed: _showApiKeyDialog,
+          ),
           IconButton(icon: const Icon(Icons.lock_outline), onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LockScreen())))
         ],
       ),
@@ -338,6 +426,15 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
                     ]),
                     const SizedBox(height: 10),
                     ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: _evolutionProgress, minHeight: 8, backgroundColor: Colors.white12, color: Colors.cyanAccent)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(hasKey ? Icons.check_circle : Icons.warning, size: 12, color: hasKey ? Colors.greenAccent : Colors.amber),
+                        const SizedBox(width: 4),
+                        Text(hasKey ? 'المفتاح: موجود - الذكاء الحقيقي شغال' : 'المفتاح: مش موجود - وضع تجريبي - دوس 🔑 فوق',
+                            style: TextStyle(fontSize: 10, color: hasKey ? Colors.greenAccent : Colors.amber)),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -374,34 +471,4 @@ class _AIDashboardScreenState extends State<AIDashboardScreen> with SingleTicker
                 Expanded(child: TextField(
                   controller: _textController,
                   onSubmitted: (val) => _processAICommand(val),
-                  decoration: InputDecoration(
-                    hintText: _isListening ? 'بسمعك...' : 'اكتب أمراً أو اضغط الميكروفون...',
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.08),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  ),
-                )),
-                const SizedBox(width: 10),
-                ScaleTransition(
-                  scale: Tween(begin: 1.0, end: 1.15).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut)),
-                  child: FloatingActionButton(
-                    onPressed: _isProcessing ? null : () {
-                      if (_textController.text.isNotEmpty && !_isListening) {
-                        _processAICommand(_textController.text);
-                      } else {
-                        _toggleListening();
-                      }
-                    },
-                    backgroundColor: _isListening ? Colors.redAccent : Colors.deepPurpleAccent,
-                    child: Icon(_isListening ? Icons.mic : (_textController.text.isNotEmpty ? Icons.send_rounded : Icons.mic_none_rounded)),
-                  ),
-                ),
-              ]),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+            
