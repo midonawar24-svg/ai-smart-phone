@@ -17,39 +17,18 @@ jobs:
         run: |
           rm -rf android .dart_tool
           flutter create --platforms=android --project-name ai_smart_phone --org com.mido.ai . --overwrite
-          # Restore main.dart if was saved by checkout (we need to have correct main.dart in repo)
-          # If lib/main.dart was overwritten, checkout again the file from git
-          git checkout HEAD -- lib/main.dart || echo "keep generated main, will use repo version"
-          cat > pubspec.yaml << 'YAML'
-          name: ai_smart_phone
-          description: AI Self System Final Fixed
-          publish_to: 'none'
-          version: 1.0.0+51
-          environment:
-            sdk: ">=3.0.0 <4.0.0"
-          dependencies:
-            flutter:
-              sdk: flutter
-            local_auth: 2.1.7
-            flutter_tts: 4.2.3
-            speech_to_text: 6.6.2
-            http: 1.2.2
-            shared_preferences: 2.3.2
-            permission_handler: 11.3.1
-          flutter:
-            uses-material-design: true
-          YAML
-          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.1.10"/' android/settings.gradle
-          python3 << 'PY'
+          git checkout HEAD -- lib/main.dart || true
+          flutter pub add local_auth flutter_tts speech_to_text http shared_preferences permission_handler
+          sed -i 's/kotlin.*2.1.10/kotlin" version "2.1.10"/' android/settings.gradle || true
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.1.10"/' android/settings.gradle || true
+          python3 <<PY
           import pathlib
-          mf = pathlib.Path("android/app/src/main/AndroidManifest.xml")
-          txt = mf.read_text()
-          if "android.permission.INTERNET" not in txt:
-              txt = txt.replace("<application", '<uses-permission android:name="android.permission.INTERNET" />
-    <application')
-              mf.write_text(txt)
-              print("Added INTERNET")
-          print("Manifest OK")
+          p=pathlib.Path('android/app/src/main/AndroidManifest.xml')
+          t=p.read_text()
+          if 'android.permission.INTERNET' not in t:
+              t=t.replace('<application','<uses-permission android:name="android.permission.INTERNET" /><application')
+              p.write_text(t)
+              print('added internet')
           PY
           flutter pub get
           flutter build apk --release --no-tree-shake-icons
@@ -57,3 +36,4 @@ jobs:
         with:
           name: app-release-WITH-INTERNET
           path: build/app/outputs/flutter-apk/app-release.apk
+          
