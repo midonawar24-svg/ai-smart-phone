@@ -13,17 +13,18 @@ jobs:
         with:
           flutter-version: '3.22.2'
           channel: 'stable'
-      - name: Recreate project
+      - name: Build APK
         run: |
-          cp pubspec.yaml /tmp/pubspec.yaml
+          echo "=== BEFORE ==="
+          ls -R | head -n 100
           cp lib/main.dart /tmp/main.dart
-          rm -rf android
-          flutter create --project-name ai_smart_phone --org com.mido.ai --overwrite .
+          cp pubspec.yaml /tmp/pubspec.yaml
+          rm -rf android ios web macos windows linux test
+          flutter create --project-name ai_smart_phone --org com.mido.ai --platforms=android --overwrite .
           cp /tmp/pubspec.yaml ./pubspec.yaml
           cp /tmp/main.dart ./lib/main.dart
           flutter pub get
-      - name: Build APK
-        run: flutter build apk --release
+          flutter build apk --release
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
