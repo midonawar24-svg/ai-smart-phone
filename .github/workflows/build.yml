@@ -9,7 +9,7 @@ jobs:
         with:
           flutter-version: '3.22.2'
           channel: 'stable'
-      - name: Fix Flutter project structure
+      - name: Fix project
         run: |
           cp pubspec.yaml /tmp/pubspec.yaml
           cp lib/main.dart /tmp/main.dart
