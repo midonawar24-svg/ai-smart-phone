@@ -1,22 +1,18 @@
+
 name: ai_smart_phone
-description: "AI Self-Evolving System - Biometric, Voice, Gemini"
+description: AI Self System V11 Lite - Guaranteed Build
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+111
 environment:
-  sdk: '>=3.2.0 <4.0.0'
-  flutter: ">=3.22.0"
+  sdk: ">=3.0.0 <4.0.0"
 dependencies:
   flutter:
     sdk: flutter
-  local_auth: ^2.1.8
-  speech_to_text: ^6.6.0
-  flutter_tts: ^4.1.2
-  http: ^1.2.0
-  shared_preferences: ^2.2.2
-  permission_handler: ^11.3.1
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
+  local_auth: 2.1.7
+  flutter_tts: 4.2.3
+  speech_to_text: 6.6.2
+  http: 1.2.2
+  shared_preferences: 2.3.2
+  permission_handler: 11.3.1
 flutter:
   uses-material-design: true
